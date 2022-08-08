@@ -2,6 +2,7 @@
 
 import numpy as np
 import bitwise_ops as bo
+from dataclasses import dataclass, field
 
 """
 README:
@@ -22,13 +23,11 @@ NONE = (None, None) #used when the application of an operator to a state returns
 
 class OPERATOR:
 
-	def __init__(self, name : str, site : int, spin : str = "", **quantum_numbers) -> None:
+	def __init__(self, name : str, site : int, spin : str = "") -> None:
 
 		self.name = name
 		self.site = site
 		self.spin = spin
-
-		self.quantum_numbers = quantum_numbers #a dictionary of all other quantum numbers 
 
 	def apply_to_bitstring(self, m : int, N : int) -> (int, int):
 		
@@ -52,14 +51,18 @@ class OPERATOR:
 		if self.name == "Sz":
 			"""
 			Here spin = "", so offset is given for the down spin site.
+			For the up site add +1.
 			"""
-			return ( 0.5 *( bit(m, offset+1) - bit(m, offset) ), m )
+			return ( 0.5 *( bo.bit(m, offset+1) - bo.bit(m, offset) ), m )
 
 		if self.name == "Sp" or self.name == "S+":
-			pass
+			raise Exception(f"{self.name} not defined.")
 
 		if self.name == "Sm" or self.name == "S-":
-			pass
+			raise Exception(f"{self.name} not defined.")
+
+		else:	
+			raise Exception(f"{self.name} not defined.")	
 
 	def __str__(self):
 		return f"{self.name}({self.site}, {self.spin})"		
@@ -67,7 +70,18 @@ class OPERATOR:
 class OPERATOR_STRING:
 
 	def __init__(self, *operators : list) -> None:
-		self.operators = operators
+			
+		_ops = []
+		for operator in operators:
+			if type(operator) == tuple or type(operator) == list:
+				op = operator_form_list(list(operator))
+				_ops.append(op)
+			elif type(operator) == OPERATOR:
+				_ops.append(operator)
+			else:
+				raise Exception("Operator not recognized. Has to be type OPERATOR or list/tuple.")
+
+		self.operators = _ops
 
 	def apply_string_to_bitstring(self, m : int, N : int) -> (int, int):
 		"""
@@ -93,14 +107,83 @@ def apply_string_to_bitstring(*operators, m : int, N : int) -> (int, int):
 		pref *= prefactor	
 	return (pref, m)
 
+def operator_form_list(op_list : list) -> OPERATOR:
+	"""
+	This must be a list of (op : str, site : int, spin : str), for example ["cdag", 3, "UP"]
+	"""
+	return OPERATOR( *op_list )
+	
 ###################################################################################################
+
+class BASIS_STATE:
+	"""
+	A basis state contains an integer representing the occupation basis part and a dictionray of
+	possible additional quantum numbers.
+	"""
+	def __init__(self, bitstring : int, **quantum_numbers) -> None:
+		self.bitstring = bitstring
+		self.quantum_numbers = quantum_numbers
+
+		self.n = bo.countSetBits(bitstring)
+
+	#The methods below have to be defined so that the basis can be ordered. 
+	#The ordering is done first by the bitstring and then by the value of the quantum numbers.
+	#NOT ALL OF THOSE METHODS HAVE TO BE IMPLEMENTED, BY THE WAY.
+
+	def __repr__(self):
+		if self.quantum_numbers == {}:
+				return f"{bin(self.bitstring)}"
+		else:
+
+			return f"{bin(self.bitstring)} |{str(self.quantum_numbers)[1:-1]}>"
+
+	def __lt__(self, other):
+		if self.bitstring == other.bitstring:
+			for qn in self.quantum_numbers:
+				if self.quantum_numbers[qn] != other.quantum_numbers[qn]:
+					return self.quantum_numbers[qn] < other.quantum_numbers[qn]
+		else:
+			return self.bitstring < other.bitstring
+
+	def __gt__(self, other):
+		if self.bitstring == other.bitstring:
+				for qn in self.quantum_numbers:
+					if self.quantum_numbers[qn] != other.quantum_numbers[qn]:
+						return self.quantum_numbers[qn] > other.quantum_numbers[qn]
+		else:
+			return self.bitstring > other.bitstring
+
+	def __le__(self, other):
+		if self.bitstring == other.bitstring:
+				for qn in self.quantum_numbers:
+					if self.quantum_numbers[qn] != other.quantum_numbers[qn]:
+						return self.quantum_numbers[qn] <= other.quantum_numbers[qn]
+		else:
+			return self.bitstring <= other.bitstring
+
+	def __ge__(self, other):
+		if self.bitstring == other.bitstring:
+			for qn in self.quantum_numbers:
+				if self.quantum_numbers[qn] != other.quantum_numbers[qn]:
+					return self.quantum_numbers[qn] >= other.quantum_numbers[qn]
+		else:
+			return self.bitstring >= other.bitstring
+
+	def __eq__(self, other):
+		if self.bitstring == other.bitstring:
+			for qn in self.quantum_numbers:
+				if self.quantum_numbers[qn] != other.quantum_numbers[qn]:
+					return False
+			return True #if bitstring is the same and all quantum numbers as well, the states are equal		
+		return False
 
 class STATE:
 
-	def __init__(self, vector, basis, N):
-		self.vector = np.array(vector)
-		self.basis = np.array(basis)
-		self.N = N # number of sites on which the state is defined.
+	def __init__(self, vector : np.array, basis : np.array, N : int) -> None:
+		self.vector = np.array(vector, dtype=complex) 	# np.array of amplitudes
+		self.basis = np.array(basis, dtype=BASIS_STATE) 	# sorted np.array of BASIS_STATEs
+		self.N = N 										# number of sites on which the state is defined.
+
 
 	def add_amplitude_to_vector(self, amplitude : float, basis_state : int) -> None:
 		"""
@@ -118,7 +201,7 @@ class STATE:
 
 ###################################################################################################
 
-def find_index(basis_state : int, basis : np.array) -> int:
+def find_index(basis_state : BASIS_STATE, basis : np.array) -> int:
 	"""
 	Finds the index of a basis_state in the basis. The basis has to be sorted!
 	"""
@@ -136,27 +219,100 @@ def apply(operator_string : OPERATOR_STRING, state : STATE) -> STATE:
 		amplitude = state.vector[i]
 		basis_state = state.basis[i]
 
-		prefactor, new_basis_state = operator_string.apply_string_to_bitstring(basis_state, state.N)
-		if (prefactor, new_basis_state) != NONE:
+		prefactor, new_bitstring = operator_string.apply_string_to_bitstring(basis_state.bitstring, state.N)
+		if (prefactor, new_bitstring) != NONE:
+			new_basis_state = BASIS_STATE( new_bitstring, **basis_state.quantum_numbers )
 			new_state.add_amplitude_to_vector(amplitude * prefactor, new_basis_state) 
 
 	return new_state	
 
+def expectedValue(operator_string : OPERATOR_STRING, state : STATE) -> float:
+	"""
+	Calculates the expected value of an operator string to a state.
+	"""
+	Opsi = apply(operator_string, state)
+	return np.dot( np.conjugate(state.vector), Opsi.vector )
+
+def expectedValueQuantumNumber(quantum_number : str, state : STATE) -> float:
+	"""
+	Computes the expected value of a quantum number in the state.
+	"""
+	exVal = 0
+	for i in range(len(state.vector)):
+		amp = state.vector[i]
+		basis_state = state.basis[i]
+
+		exVal += np.conjugate(amp) * basis_state.quantum_numbers[quantum_number] * amp
+	return exVal	
+
+def expectedValueQuantumNumberSquared(quantum_number : str, state : STATE) -> float:
+	"""
+	Computes the expected value of a quantum number in the state.
+	"""
+	exVal = 0
+	for i in range(len(state.vector)):
+		amp = state.vector[i]
+		basis_state = state.basis[i]
+
+		exVal += np.conjugate(amp) * (basis_state.quantum_numbers[quantum_number]**2) * amp
+	return exVal	
+
 ###################################################################################################
 #TEST
+
 if 0:
 	# single site test
 
 	op1 = OPERATOR(name = "cdag", site = 0, spin = "UP")
 	op2 = OPERATOR(name = "c", site = 0, spin = "UP")
 	op3 = OPERATOR(name = "n", site = 0, spin = "UP")
+	op4 = OPERATOR(name = "Sz", site = 0)
 
-	basis = [0, 1, 2, 3,]
+	basis = np.array([BASIS_STATE(i) for i in range(4)])
 	vector =[1, 10, 100, 1000]
 
 	bb = STATE(vector, basis, 1)
 	print(bb.vector)
-	print([bin(i) for i in bb.basis])
+	print([i for i in bb.basis])
+
+	print("cdag c")
+
+	op = OPERATOR_STRING( op1, op2 )
+	res = apply(op, bb)
+
+	print(res.vector)
+	print(res.basis)
+
+	print("n")
+
+	op = OPERATOR_STRING( op3 )
+	res = apply(op, bb)
+
+	print(res.vector)
+	print(res.basis)
+
+	print("Sz")
+
+	op = OPERATOR_STRING( op4 )
+	res = apply(op, bb)
+
+	print(res.vector)
+	print(res.basis)
+
+if 0:
+	# single site with quantum numbers
+
+	op1 = OPERATOR(name = "cdag", site = 0, spin = "DO")
+	op2 = OPERATOR(name = "c", site = 0, spin = "DO")
+	op3 = OPERATOR(name = "n", site = 0, spin = "DO")
+
+	basis = np.array([BASIS_STATE(i, phi = 1, x = 3) for i in range(4)] + [BASIS_STATE(i, phi = 3, x = 0) for i in range(4)]  )
+	basis = sorted(basis)
+	vector =[1, 10, 100, 1000, 2, 20, 200, 2000]
+
+	bb = STATE(vector, basis, 1)
+	print(bb.vector)
+	print([i for i in bb.basis])
 
 	op = OPERATOR_STRING( op1, op2 )
 	res = apply(op, bb)

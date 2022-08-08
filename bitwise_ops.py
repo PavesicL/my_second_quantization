@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from numba import jit
 
-
 @jit
 def offset(site : str, spin : str, N : int) -> int:
 	"""
@@ -9,8 +8,8 @@ def offset(site : str, spin : str, N : int) -> int:
 	Used for bitwise operations.
 	If spin is an empty string (eg. for spin operators) returns the offset of the down site.
 	"""
+	spin = spin.upper()
 	return 2 * ( N - 1 - site ) + (1 if spin == "UP" else 0)
-
 
 @jit
 def fermionic_prefactor(m : int, offset : int, N : int) -> int: 
@@ -72,3 +71,15 @@ def spinDownBits(m : int, N : int) -> int:
 		if bit(m, i)==1:
 			count+=1	
 	return count
+
+def generate_Sz_basis(Sz : float, N : int) -> list:
+	"""
+	Returns a list of integers corresponding to basis states
+	with given Sz on N sites.
+	"""
+	res = []
+	for m in range(2**(2*N)):
+		thisSz = 0.5 * (spinUpBits(m, N) - spinDownBits(m, N))
+		if Sz == thisSz:
+			res.append(m)
+	return res
