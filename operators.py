@@ -224,8 +224,6 @@ class STATE:
 		Finds the index of the basis_state in the basis and adds the amplitude to that site.
 		"""
 		ndx = find_index(basis_state, self.basis)
-
-		print("AAA", ndx)
 		self.vector[ndx] += amplitude
 
 	def __add__(self, other):
@@ -394,8 +392,6 @@ if 0:
 
 	print(res.vector)
 	print(res.basis)
-
-	print("AAAA")
 
 	op = OPERATOR_STRING( op3 )
 	res = apply(op, bb)
