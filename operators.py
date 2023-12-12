@@ -3,6 +3,7 @@
 import numpy as np
 import bitwise_ops as bo
 from dataclasses import dataclass, field
+import cmath
 
 """
 README:
@@ -76,10 +77,10 @@ class OPERATOR_STRING:
 			if type(operator) == tuple or type(operator) == list:
 				op = operator_form_list(list(operator))
 				_ops.append(op)
-			elif type(operator) == OPERATOR:
+			elif type(operator) == OPERATOR or type(operator) == SPIN_OPERATOR:
 				_ops.append(operator)
 			else:
-				raise Exception("Operator not recognized. Has to be type OPERATOR or list/tuple.")
+				raise Exception("Operator not recognized. Has to be type OPERATOR or SPIN_OPERATOR or list/tuple.")
 
 		self.operators = _ops
 
@@ -94,6 +95,40 @@ class OPERATOR_STRING:
 				return NONE			
 			pref *= prefactor	
 		return (pref, m)
+
+###################################################################################################
+# This is a class that defines spin operators, as acting on a string in the Sz basis.
+class SPIN_OPERATOR:
+	
+	def __init__(self, name : str, site : int) -> None:
+
+		self.name = name
+		self.site = site
+		
+		if not name in ("Sx", "Sy", "Sz"):
+			raise Exception(f"Spin operator with unrecognized name {name}! Has to be Sx, Sy or Sz.")
+
+
+	def apply_to_bitstring(self, m : int, N : int) -> (complex, int):
+
+		offset = N - self.site #for a string of spins (Sz basis - up or down), the offset from the back is just this.
+
+		if self.name == "Sx":
+			prefactor = +1
+			return ( prefactor, bo.flipBit(m, offset) )				
+
+		elif self.name == "Sy":
+			state = bo.bit(m, offset) #measure the state of the bit
+			prefactor = -1j if state==1 else +1j
+			return ( prefactor, bo.flipBit(m, offset) )				
+
+
+		elif self.name == "Sz":
+			state = bo.bit(m, offset) #measure the state of the bit
+			prefactor = +1 if state==1 else -1
+			return ( prefactor, m )				
+
+###################################################################################################
 
 def apply_string_to_bitstring(*operators, m : int, N : int) -> (int, int):
 	"""
@@ -117,7 +152,7 @@ def operator_form_list(op_list : list) -> OPERATOR:
 
 class BASIS_STATE:
 	"""
-	A basis state contains an integer representing the occupation basis part and a dictionray of
+	A basis state contains an integer representing the occupation basis part and a dictionary of
 	possible additional quantum numbers.
 	"""
 	def __init__(self, bitstring : int, **quantum_numbers) -> None:
@@ -134,7 +169,6 @@ class BASIS_STATE:
 		if self.quantum_numbers == {}:
 				return f"{bin(self.bitstring)}"
 		else:
-
 			return f"{bin(self.bitstring)} |{str(self.quantum_numbers)[1:-1]}>"
 
 	def __lt__(self, other):
@@ -191,6 +225,8 @@ class STATE:
 		Finds the index of the basis_state in the basis and adds the amplitude to that site.	
 		"""
 		ndx = find_index(basis_state, self.basis)
+		
+		print("AAA", ndx)
 		self.vector[ndx] += amplitude
 		
 	def __add__(self, other):
@@ -199,6 +235,22 @@ class STATE:
 		else:
 			raise Exception("Error when adding two states - the basis do not match!")
 
+	def __repr__(self):
+		sorted_vec, sorted_basis = zip(*sorted(zip(self.vector, self.basis), key = lambda x : x[0]))
+		res = ""
+		for i in range(len(self.vector)):
+			amp = self.vector[i]
+			bas = self.basis[i]
+			if amp != 0:
+				res += f"{abs(amp)}	e^({round(cmath.phase(amp)/np.pi,3)}/pi)		{bas}\n"
+		return res
+	
+	def pad_with_zeros(str, N):
+		"""
+		Pads the binary string with zeros so that its length is N.
+		"""
+		a = 1
+		return 
 ###################################################################################################
 
 def find_index(basis_state : BASIS_STATE, basis : np.array) -> int:
@@ -258,7 +310,31 @@ def expectedValueQuantumNumberSquared(quantum_number : str, state : STATE) -> fl
 	return exVal	
 
 ###################################################################################################
-#TEST
+#TESTS
+
+if 1:
+	# spin operators test
+	print("TESTING 1")
+	opx = SPIN_OPERATOR(name = "Sx", site = 1)
+	opy = SPIN_OPERATOR(name = "Sy", site = 0)
+	opz = SPIN_OPERATOR(name = "Sz", site = 0)
+
+	basis = np.array([BASIS_STATE(i) for i in range(5)])
+	vector = [1, 10, 100, 1000, 10000]
+
+	bb = STATE(vector, basis, 5)
+	print(bb.vector)
+	print([i for i in bb.basis])
+
+	print("apply Sx")
+	op = OPERATOR_STRING( opz )
+	res = apply(op, bb)
+
+	print(res)
+	print(type(res))
+	print(res.N)
+	#print("apply Sx")
+	#print("apply Sx")
 
 if 0:
 	# single site test
