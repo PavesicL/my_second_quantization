@@ -312,7 +312,7 @@ def expectedValueQuantumNumberSquared(quantum_number : str, state : STATE) -> fl
 ###################################################################################################
 #TESTS
 
-if 1:
+if 0:
 	# spin operators test
 	print("TESTING 1")
 	opx = SPIN_OPERATOR(name = "Sx", site = 1)
