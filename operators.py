@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import bitwise_ops as bo
-from dataclasses import dataclass, field
+import my_second_quantization.bitwise_ops as bo
 import cmath
 
 """
@@ -10,13 +9,13 @@ README:
 The OPERATOR class handles the initialization of operators. Its method apply_to_bitstring defines how a given operator acts on
 an integer representing an basis state in the occupation basis. The ordering of sites is (0, UP), (0, DOWN), (1, UP), (1, DOWN), ...
 
-The OPERATOR_STRING class acts as a container for multiple operators. It knows how to apply the whole string of operators to a 
-given integer. 
+The OPERATOR_STRING class acts as a container for multiple operators. It knows how to apply the whole string of operators to a
+given integer.
 
-The STATE class is a container for a state. Vector is a np.array of amplitudes and basis is a np.array of integers representing 
-the basis. The add_amplitude_to_vector method is used when applying an operator to the state. 
+The STATE class is a container for a state. Vector is a np.array of amplitudes and basis is a np.array of integers representing
+the basis. The add_amplitude_to_vector method is used when applying an operator to the state.
 
-The apply function gets and operator string type and applies it to a given state. 
+The apply function gets and operator string type and applies it to a given state.
 """
 ###################################################################################################
 
@@ -31,7 +30,7 @@ class OPERATOR:
 		self.spin = spin
 
 	def apply_to_bitstring(self, m : int, N : int) -> (int, int):
-		
+
 		offset = bo.offset(self.site, self.spin, N)
 
 		if self.name == "c":
@@ -62,16 +61,16 @@ class OPERATOR:
 		if self.name == "Sm" or self.name == "S-":
 			raise Exception(f"{self.name} not defined.")
 
-		else:	
-			raise Exception(f"{self.name} not defined.")	
+		else:
+			raise Exception(f"{self.name} not defined.")
 
 	def __str__(self):
-		return f"{self.name}({self.site}, {self.spin})"		
+		return f"{self.name}({self.site}, {self.spin})"
 
 class OPERATOR_STRING:
 
 	def __init__(self, *operators : list) -> None:
-			
+
 		_ops = []
 		for operator in operators:
 			if type(operator) == tuple or type(operator) == list:
@@ -92,19 +91,19 @@ class OPERATOR_STRING:
 		for operator in reversed(self.operators):
 			prefactor, m = operator.apply_to_bitstring(m, N)
 			if (prefactor, m) == NONE:
-				return NONE			
-			pref *= prefactor	
+				return NONE
+			pref *= prefactor
 		return (pref, m)
 
 ###################################################################################################
 # This is a class that defines spin operators, as acting on a string in the Sz basis.
 class SPIN_OPERATOR:
-	
+
 	def __init__(self, name : str, site : int) -> None:
 
 		self.name = name
 		self.site = site
-		
+
 		if not name in ("Sx", "Sy", "Sz"):
 			raise Exception(f"Spin operator with unrecognized name {name}! Has to be Sx, Sy or Sz.")
 
@@ -115,18 +114,18 @@ class SPIN_OPERATOR:
 
 		if self.name == "Sx":
 			prefactor = +1
-			return ( prefactor, bo.flipBit(m, offset) )				
+			return ( prefactor, bo.flipBit(m, offset) )
 
 		elif self.name == "Sy":
 			state = bo.bit(m, offset) #measure the state of the bit
 			prefactor = -1j if state==1 else +1j
-			return ( prefactor, bo.flipBit(m, offset) )				
+			return ( prefactor, bo.flipBit(m, offset) )
 
 
 		elif self.name == "Sz":
 			state = bo.bit(m, offset) #measure the state of the bit
 			prefactor = +1 if state==1 else -1
-			return ( prefactor, m )				
+			return ( prefactor, m )
 
 ###################################################################################################
 
@@ -138,8 +137,8 @@ def apply_string_to_bitstring(*operators, m : int, N : int) -> (int, int):
 	for operator in reversed(operators):
 		prefactor, m = operator.apply_to_bitstring(m, N)
 		if (prefactor, m) == NONE:
-			return NONE			
-		pref *= prefactor	
+			return NONE
+		pref *= prefactor
 	return (pref, m)
 
 def operator_form_list(op_list : list) -> OPERATOR:
@@ -147,7 +146,7 @@ def operator_form_list(op_list : list) -> OPERATOR:
 	This must be a list of (op : str, site : int, spin : str), for example ["cdag", 3, "UP"]
 	"""
 	return OPERATOR( *op_list )
-	
+
 ###################################################################################################
 
 class BASIS_STATE:
@@ -161,7 +160,7 @@ class BASIS_STATE:
 
 		self.n = bo.countSetBits(bitstring)
 
-	#The methods below have to be defined so that the basis can be ordered. 
+	#The methods below have to be defined so that the basis can be ordered.
 	#The ordering is done first by the bitstring and then by the value of the quantum numbers.
 	#NOT ALL OF THOSE METHODS HAVE TO BE IMPLEMENTED, BY THE WAY.
 
@@ -208,7 +207,7 @@ class BASIS_STATE:
 			for qn in self.quantum_numbers:
 				if self.quantum_numbers[qn] != other.quantum_numbers[qn]:
 					return False
-			return True #if bitstring is the same and all quantum numbers as well, the states are equal		
+			return True #if bitstring is the same and all quantum numbers as well, the states are equal
 		return False
 
 class STATE:
@@ -221,14 +220,14 @@ class STATE:
 
 	def add_amplitude_to_vector(self, amplitude : float, basis_state : int) -> None:
 		"""
-		Adds amplitude to the basis_state in state. 
-		Finds the index of the basis_state in the basis and adds the amplitude to that site.	
+		Adds amplitude to the basis_state in state.
+		Finds the index of the basis_state in the basis and adds the amplitude to that site.
 		"""
 		ndx = find_index(basis_state, self.basis)
-		
+
 		print("AAA", ndx)
 		self.vector[ndx] += amplitude
-		
+
 	def __add__(self, other):
 		if np.array_equal(self.basis, other.basis) and self.N == other.N:
 			return STATE(self.vector + other.vector, self.basis, self.N)
@@ -244,13 +243,13 @@ class STATE:
 			if amp != 0:
 				res += f"{abs(amp)}	e^({round(cmath.phase(amp)/np.pi,3)}/pi)		{bas}\n"
 		return res
-	
+
 	def pad_with_zeros(str, N):
 		"""
 		Pads the binary string with zeros so that its length is N.
 		"""
 		a = 1
-		return 
+		return
 ###################################################################################################
 
 def find_index(basis_state : BASIS_STATE, basis : np.array) -> int:
@@ -261,12 +260,12 @@ def find_index(basis_state : BASIS_STATE, basis : np.array) -> int:
 
 def apply(operator_string : OPERATOR_STRING, state : STATE) -> STATE:
 	"""
-	Applies the string of operators to the state.		
+	Applies the string of operators to the state.
 	"""
 	#Initialize a new empty state in the same basis
 	new_state = STATE( vector = np.zeros( len(state.basis) ), basis = state.basis, N = state.N)
 
-	#For every element in the initial state, act on it with the operator string and add the result to the new state. 
+	#For every element in the initial state, act on it with the operator string and add the result to the new state.
 	for i in range(len(state.basis)):
 		amplitude = state.vector[i]
 		basis_state = state.basis[i]
@@ -274,9 +273,9 @@ def apply(operator_string : OPERATOR_STRING, state : STATE) -> STATE:
 		prefactor, new_bitstring = operator_string.apply_string_to_bitstring(basis_state.bitstring, state.N)
 		if (prefactor, new_bitstring) != NONE:
 			new_basis_state = BASIS_STATE( new_bitstring, **basis_state.quantum_numbers )
-			new_state.add_amplitude_to_vector(amplitude * prefactor, new_basis_state) 
+			new_state.add_amplitude_to_vector(amplitude * prefactor, new_basis_state)
 
-	return new_state	
+	return new_state
 
 def expectedValue(operator_string : OPERATOR_STRING, state : STATE) -> float:
 	"""
@@ -295,7 +294,7 @@ def expectedValueQuantumNumber(quantum_number : str, state : STATE) -> float:
 		basis_state = state.basis[i]
 
 		exVal += np.conjugate(amp) * basis_state.quantum_numbers[quantum_number] * amp
-	return exVal	
+	return exVal
 
 def expectedValueQuantumNumberSquared(quantum_number : str, state : STATE) -> float:
 	"""
@@ -307,7 +306,7 @@ def expectedValueQuantumNumberSquared(quantum_number : str, state : STATE) -> fl
 		basis_state = state.basis[i]
 
 		exVal += np.conjugate(amp) * (basis_state.quantum_numbers[quantum_number]**2) * amp
-	return exVal	
+	return exVal
 
 ###################################################################################################
 #TESTS
@@ -406,7 +405,7 @@ if 0:
 
 if 0:
 	# two site test
-	N = 2 
+	N = 2
 
 	op1 = OPERATOR(name = "cdag", site = 0, spin = "UP")
 	op2 = OPERATOR(name = "c", site = 1, spin = "UP")
